@@ -5,6 +5,7 @@
 /*--------------------------------------------------------------------*/
 #include <stdlib.h>
 #include <stdio.h>
+#include <math.h>
 /*--------------------------------------------------------------------*/
 typedef unsigned char U8;
 /*--------------------------------------------------------------------*/
@@ -21,8 +22,46 @@ double *resamples;
 U8 *data;
 unsigned int datasize;
 /*--------------------------------------------------------------------*/
+void resample_fft(double *in, unsigned int insize, unsigned int infreq,
+				double *out, unsigned int outsize, unsigned int outfreq)
+{
+	unsigned int i,j,limit;
+	const double pi=2.0*acos(0.0);
+	const double N=(double)(insize);
+	double x,y,am,ph,freq,t,w,xn;
+	printf("FFT Resample from %iHz to %iHz\n",infreq,outfreq);
+	for (i=0; i<outsize; i++) {out[i]=0.0;};	// clear output
+	limit=outfreq*insize/(2*infreq);	// limit half outfreq
+	for (i=1; i<limit; i++)	// 1=> without offset; only pos freq
+	{
+		freq=((double)(i)*(double)(infreq)/(double)(insize));
+		printf("%i%%     \n\033[A",100*i/limit);
+		if (freq<((double)(outfreq)/2.0)) // Protect Nyquist limit
+		{
+			x=0;
+			y=0;
+			for (j=0; j<insize; j++)
+			{
+				w=-2.0*pi*(double)(i*j)/N;
+				xn=in[j];
+				x=x+xn*cos(w);
+				y=y+xn*sin(w);	
+			};
+			am=sqrt(x*x+y*y);
+			ph=atan2(y,x);
+			for (j=0; j<outsize; j++)
+			{
+				t=(double)(j)/(double)(outfreq);
+				out[j]+=(am*sin(2.0*pi*freq*t+ph));
+			};
+		}
+		else {i=limit;};
+	};	
+}
+/*--------------------------------------------------------------------*/
 void resample()
 {
+	/* OLD AVERAGE METHOD - FASTES
 	unsigned int i,p1,p2;
 	double p,s,s1,s2;
 	for (i=0; i<datasize; i++)
@@ -35,7 +74,8 @@ void resample()
 		p=(p-(double)(p1));
 		s=(s2*p+s1*(1.0-p));
 		resamples[i]=s;
-	};
+	};*/
+	resample_fft(samples,musicsize,samplerate,resamples,datasize,FREQTARGET);
 }
 /*--------------------------------------------------------------------*/
 void killsilent(void)
